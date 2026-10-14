@@ -96,6 +96,30 @@ A Python compression utility is also available in `scripts/compress_pdf.py`:
 python3 scripts/compress_pdf.py "My Book.pdf" "My Book (Compressed).pdf" 75
 ```
 
+### Telegram Bot Mode
+
+Run `anyflip-downloader` as a personal Telegram bot with interactive buttons for quality selection and direct PDF uploads.
+
+```sh
+# Set environment variables or pass flags
+export TELEGRAM_BOT_TOKEN="123456789:AAH..."
+export ALLOWED_USER_IDS="987654321"   # Your Telegram numeric ID (from @userinfobot)
+
+# Launch the bot
+anyflip-downloader -bot
+```
+
+Or pass flags directly:
+```sh
+anyflip-downloader -bot -token "YOUR_BOT_TOKEN" -allowed-users "YOUR_TELEGRAM_ID"
+```
+
+#### Bot Features:
+- **Interactive Inline Buttons**: Sends real file size estimates for each quality preset.
+- **In-stream Compression**: Keeps PDFs under Telegram's 50 MB upload limit.
+- **Private & Secure**: Protects your bot with `-allowed-users` so strangers cannot use your bot.
+- **Auto Cleanup**: Removes temporary download folders and PDFs automatically after uploading.
+
 ### Set title manually
 
 If you do not want to use the book title from anyflip, you can change it using the `-title` flag.

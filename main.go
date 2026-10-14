@@ -31,6 +31,9 @@ var preset string
 var noPrompt bool
 var compressFile string
 var outputFileOverride string
+var botMode bool
+var botToken string
+var allowedUsers string
 
 type flipbook struct {
 	URL       *url.URL
@@ -63,6 +66,9 @@ func init() {
 	flag.BoolVar(&noPrompt, "no-prompt", false, "Skip interactive prompts and use recommended defaults")
 	flag.StringVar(&compressFile, "compress", "", "Compress an existing PDF document instead of downloading")
 	flag.StringVar(&outputFileOverride, "output", "", "Output filename for the compressed PDF")
+	flag.BoolVar(&botMode, "bot", false, "Run as a Telegram bot")
+	flag.StringVar(&botToken, "token", "", "Telegram bot token (or set TELEGRAM_BOT_TOKEN env var)")
+	flag.StringVar(&allowedUsers, "allowed-users", "", "Comma-separated list of allowed Telegram user IDs (or set ALLOWED_USER_IDS env var)")
 }
 
 func main() {
@@ -71,6 +77,28 @@ func main() {
 }
 
 func run() {
+	if botMode || os.Getenv("TELEGRAM_BOT_MODE") == "1" {
+		token := botToken
+		if token == "" {
+			token = os.Getenv("TELEGRAM_BOT_TOKEN")
+		}
+		if token == "" {
+			log.Fatal("error: telegram bot token is required. Pass -token or set TELEGRAM_BOT_TOKEN env var")
+		}
+
+		userList := allowedUsers
+		if userList == "" {
+			userList = os.Getenv("ALLOWED_USER_IDS")
+		}
+		users := parseAllowedUsers(userList)
+
+		bot := newTelegramBot(token, users)
+		if err := bot.Start(); err != nil {
+			log.Fatalf("bot error: %v", err)
+		}
+		return
+	}
+
 	if compressFile != "" {
 		compQuality := QualityRecommended
 		if quality > 0 && quality <= 100 {
@@ -178,6 +206,7 @@ func printUsage() {
 	fmt.Fprintf(w, "Usage:\n")
 	fmt.Fprintf(w, "  %s [OPTIONS] <url>\n", os.Args[0])
 	fmt.Fprintf(w, "  %s -compress <file.pdf> [OPTIONS]\n", os.Args[0])
+	fmt.Fprintf(w, "  %s -bot [OPTIONS]\n", os.Args[0])
 	fmt.Fprintf(w, "\nOptions:\n")
 	flag.PrintDefaults()
 }
