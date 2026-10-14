@@ -51,9 +51,14 @@ func prepareDownload(anyflipURL *url.URL) (*flipbook, error) {
 	newFlipbook.pageCount, err = getPageCount(configjs)
 	pageFileNames := getPageFileNames(configjs)
 
-	downloadURL, _ := url.Parse("https://online.anyflip.com/")
+	downloadURL := bookAssetBaseURL(anyflipURL)
 	println(newFlipbook.URL.String())
-	if len(pageFileNames) == 0 {
+	if isFlipHTML5URL(anyflipURL) {
+		for i := 1; i <= newFlipbook.pageCount; i++ {
+			downloadURL.Path = path.Join(newFlipbook.URL.Path, "files", "large", strconv.Itoa(i)+".webp")
+			newFlipbook.pageURLs = append(newFlipbook.pageURLs, downloadURL.String())
+		}
+	} else if len(pageFileNames) == 0 {
 		for i := 1; i <= newFlipbook.pageCount; i++ {
 			downloadURL.Path = path.Join(newFlipbook.URL.Path, "files", "mobile", strconv.Itoa(i)+".jpg")
 			newFlipbook.pageURLs = append(newFlipbook.pageURLs, downloadURL.String())
@@ -66,6 +71,14 @@ func prepareDownload(anyflipURL *url.URL) (*flipbook, error) {
 	}
 
 	return &newFlipbook, err
+}
+
+func bookAssetBaseURL(bookURL *url.URL) *url.URL {
+	return &url.URL{Scheme: bookURL.Scheme, Host: bookURL.Host}
+}
+
+func isFlipHTML5URL(bookURL *url.URL) bool {
+	return strings.EqualFold(bookURL.Hostname(), "online.fliphtml5.com")
 }
 
 func sanitizeURL(anyflipURL *url.URL) {

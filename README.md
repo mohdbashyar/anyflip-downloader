@@ -3,7 +3,7 @@
 [![build](https://github.com/Lofter1/anyflip-downloader/actions/workflows/build.yml/badge.svg)](https://github.com/Lofter1/anyflip-downloader/actions/workflows/build.yml)
 [![goreleaser](https://github.com/Lofter1/anyflip-downloader/actions/workflows/release.yml/badge.svg)](https://github.com/Lofter1/anyflip-downloader/actions/workflows/release.yml)
 
-Download anyflip books as PDF
+Download AnyFlip and FlipHTML5 books as PDF
 
 ![Demo](/assets/demo.gif)
 
@@ -44,6 +44,8 @@ go install github.com/Lofter1/anyflip-downloader@latest
 ```sh
 anyflip-downloader <url to book>
 ```
+
+Book URLs from `online.anyflip.com` and `online.fliphtml5.com` are supported.
 
 ### Set title manually
 

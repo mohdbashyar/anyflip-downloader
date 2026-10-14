@@ -63,11 +63,12 @@ func getPageCount(configjs string) (int, error) {
 }
 
 func downloadConfigJSFile(bookURL *url.URL) (string, error) {
-	configjsURL, err := url.Parse("https://online.anyflip.com")
-	if err != nil {
-		return "", err
+	configjsURL := bookAssetBaseURL(bookURL)
+	configPath := []string{"mobile", "javascript", "config.js"}
+	if isFlipHTML5URL(bookURL) {
+		configPath = []string{"javascript", "config.js"}
 	}
-	configjsURL.Path = path.Join(bookURL.Path, "mobile", "javascript", "config.js")
+	configjsURL.Path = path.Join(append([]string{bookURL.Path}, configPath...)...)
 	resp, err := http.Get(configjsURL.String())
 	if err != nil {
 		return "", err
