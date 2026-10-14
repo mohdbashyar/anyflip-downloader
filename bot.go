@@ -302,6 +302,26 @@ func (b *TelegramBot) Start() error {
 		log.Printf("⚠️ WARNING: No allowed-users specified! Bot is accessible to everyone.")
 	}
 
+	// Start optional HTTP health-check server if PORT is provided (for cloud hosts like Render)
+	port := os.Getenv("PORT")
+	if port != "" {
+		go func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprintf(w, "AnyFlip Downloader Telegram Bot is online!\n")
+			})
+			mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprintf(w, "OK\n")
+			})
+			log.Printf("🌐 HTTP server listening on port %s (health check ready)", port)
+			if err := http.ListenAndServe(":"+port, mux); err != nil {
+				log.Printf("HTTP server warning: %v", err)
+			}
+		}()
+	}
+
 	// Clean up old pending requests every 10 minutes
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
