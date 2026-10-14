@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-
+	"sort"
 	"strings"
 	"time"
 
@@ -26,6 +26,11 @@ var donwloadThreads int
 var downloadRetries int
 var downloadRetryDelay time.Duration
 var chunkSize uint
+var quality int
+var preset string
+var noPrompt bool
+var compressFile string
+var outputFileOverride string
 
 type flipbook struct {
 	URL       *url.URL
@@ -35,9 +40,11 @@ type flipbook struct {
 }
 
 type downloadOptions struct {
-	threads    int
-	retries    int
-	retryDelay time.Duration
+	threads        int
+	retries        int
+	retryDelay     time.Duration
+	quality        int
+	samplePageData []byte
 }
 
 func init() {
@@ -50,6 +57,12 @@ func init() {
 	flag.IntVar(&downloadRetries, "retries", 1, "Number of download retries")
 	flag.DurationVar(&downloadRetryDelay, "waitretry", time.Second, "Wait time between download retries")
 	flag.UintVar(&chunkSize, "chunksize", 10, "Amount of images converted at once. Higher amount amount will end in less write actions but more memory usage")
+	flag.IntVar(&quality, "quality", 0, "JPEG compression quality (1-100, 100=original uncompressed, default: interactive prompt)")
+	flag.StringVar(&preset, "preset", "", "Quality preset: original, recommended, compact, small")
+	flag.BoolVar(&noPrompt, "yes", false, "Skip interactive prompts and use recommended defaults")
+	flag.BoolVar(&noPrompt, "no-prompt", false, "Skip interactive prompts and use recommended defaults")
+	flag.StringVar(&compressFile, "compress", "", "Compress an existing PDF document instead of downloading")
+	flag.StringVar(&outputFileOverride, "output", "", "Output filename for the compressed PDF")
 }
 
 func main() {
@@ -58,6 +71,24 @@ func main() {
 }
 
 func run() {
+	if compressFile != "" {
+		compQuality := QualityRecommended
+		if quality > 0 && quality <= 100 {
+			compQuality = quality
+		} else if pQuality, ok := parsePreset(preset); ok {
+			compQuality = pQuality
+		} else if isInteractiveTerminal() && !noPrompt {
+			estimates := fallbackEstimates(100)
+			compQuality = promptCompressionChoice(estimates)
+		}
+
+		err := compressPDFFile(compressFile, outputFileOverride, compQuality)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	if flag.NArg() == 0 {
 		fmt.Fprintln(os.Stderr, "error: no URL provided")
 		printUsage()
@@ -80,6 +111,25 @@ func run() {
 		log.Fatal(err)
 	}
 
+	selectedQuality := QualityRecommended
+	var sampleData []byte
+
+	if quality > 0 && quality <= 100 {
+		selectedQuality = quality
+	} else if pQuality, ok := parsePreset(preset); ok {
+		selectedQuality = pQuality
+	} else if noPrompt || !isInteractiveTerminal() {
+		selectedQuality = QualityRecommended
+	} else {
+		fmt.Printf("Analyzing book (%d pages)...\n", flipbook.pageCount)
+		var estimates *SizeEstimates
+		sampleData, estimates, err = flipbook.samplePage()
+		if err != nil {
+			estimates = fallbackEstimates(flipbook.pageCount)
+		}
+		selectedQuality = promptCompressionChoice(estimates)
+	}
+
 	if tempDownloadFolder == "" {
 		tempDownloadFolder = flipbook.title
 	}
@@ -89,10 +139,19 @@ func run() {
 		log.Fatalf("invalid download path: %v", err)
 	}
 	outputFile := title + ".pdf"
+	if outputFileOverride != "" {
+		outputFile = outputFileOverride
+	}
 
 	err = flipbook.downloadImages(
 		tempDownloadFolder,
-		downloadOptions{threads: donwloadThreads, retries: downloadRetries, retryDelay: downloadRetryDelay},
+		downloadOptions{
+			threads:        donwloadThreads,
+			retries:        downloadRetries,
+			retryDelay:     downloadRetryDelay,
+			quality:        selectedQuality,
+			samplePageData: sampleData,
+		},
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -107,14 +166,19 @@ func run() {
 		os.RemoveAll(tempDownloadFolder)
 	}
 
-	fmt.Println("Done")
+	if fi, err := os.Stat(outputFile); err == nil {
+		fmt.Printf("\nDone! Saved to: %s (%s)\n", outputFile, formatBytes(fi.Size()))
+	} else {
+		fmt.Println("Done")
+	}
 }
 
 func printUsage() {
 	w := flag.CommandLine.Output()
 	fmt.Fprintf(w, "Usage:\n")
 	fmt.Fprintf(w, "  %s [OPTIONS] <url>\n", os.Args[0])
-	fmt.Fprintf(w, "Options:\n")
+	fmt.Fprintf(w, "  %s -compress <file.pdf> [OPTIONS]\n", os.Args[0])
+	fmt.Fprintf(w, "\nOptions:\n")
 	flag.PrintDefaults()
 }
 
@@ -139,7 +203,7 @@ func createPDF(outputFile string, imageDir string, chunkSize int) error {
 		if file.IsDir() {
 			continue
 		}
-		ext := filepath.Ext(file.Name())
+		ext := strings.ToLower(filepath.Ext(file.Name()))
 		if ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp" {
 			imagePaths = append(imagePaths, filepath.Join(imageDir, file.Name()))
 		}
@@ -148,6 +212,8 @@ func createPDF(outputFile string, imageDir string, chunkSize int) error {
 	if len(imagePaths) == 0 {
 		return fmt.Errorf("no images found in path %s", imageDir)
 	}
+
+	sort.Strings(imagePaths)
 
 	bar := progressbar.NewOptions(len(imagePaths),
 		progressbar.OptionFullWidth(),

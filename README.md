@@ -38,7 +38,7 @@ For `go install`, the [go tools](https://go.dev/doc/install) are required.
 ```sh
 go install github.com/Lofter1/anyflip-downloader@latest
 ```
-
+ 
 ## Usage
 
 ```sh
@@ -46,6 +46,55 @@ anyflip-downloader <url to book>
 ```
 
 Book URLs from `online.anyflip.com` and `online.fliphtml5.com` are supported.
+
+### Interactive Quality & PDF Compression (Recommended)
+
+AnyFlip and FlipHTML5 books often produce 100MB–300MB PDFs when saved as uncompressed images. When you run `anyflip-downloader <url>`, it analyzes the book and prompts you with estimated file sizes for different quality levels:
+
+```text
+Choose PDF download size / quality:
+  [1] Original     : ~213.2 MB  (100% original quality, uncompressed)
+  [2] Recommended  : ~ 26.1 MB  (JPEG 75 - 88% smaller, crisp text) [Default]
+  [3] Compact      : ~ 18.2 MB  (JPEG 60 - 91% smaller, balanced)
+  [4] Small        : ~ 12.0 MB  (JPEG 45 - 94% smaller, mobile/email)
+  [5] Custom       : Enter custom JPEG quality (1-100)
+
+Select option [1-5] (default: 2): 
+```
+
+Press **Enter** to choose the Recommended setting (reduces PDF size by ~85% with sharp, clear text), or select an option.
+
+#### Set quality or preset via flags (Automation / CI)
+
+To skip the interactive prompt, use `-quality` or `-preset`:
+
+```sh
+# Choose preset: recommended, compact, small, original
+anyflip-downloader -preset recommended <url>
+
+# Specify exact JPEG quality (1-100, 100=uncompressed)
+anyflip-downloader -quality 75 <url>
+
+# Automatically accept recommended default without prompting
+anyflip-downloader -yes <url>
+```
+
+### Compress an Existing PDF File
+
+You can also compress already downloaded PDFs directly without needing any external tools:
+
+```sh
+# Compresses the PDF and saves as "Book (Compressed).pdf"
+anyflip-downloader -compress "My Book.pdf"
+
+# Specify custom quality and output file
+anyflip-downloader -compress "My Book.pdf" -quality 60 -output "My Book (Small).pdf"
+```
+
+A Python compression utility is also available in `scripts/compress_pdf.py`:
+```sh
+python3 scripts/compress_pdf.py "My Book.pdf" "My Book (Compressed).pdf" 75
+```
 
 ### Set title manually
 

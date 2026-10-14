@@ -156,48 +156,65 @@ func (fb *flipbook) downloadImages(downloadFolder string, options downloadOption
 
 func (fb *flipbook) downloadPage(page int, folder string, options downloadOptions) error {
 	downloadURL := cleanDownloadURL(fb.pageURLs[page])
+	ext := strings.ToLower(path.Ext(downloadURL))
 
-	var resp *http.Response
-	var err error
+	filename := fmt.Sprintf("%04d%s", page, ext)
+	if options.quality > 0 && options.quality < 100 {
+		filename = fmt.Sprintf("%04d.jpg", page)
+	}
+	filePath := filepath.Join(folder, filename)
 
-	for attempt := 0; attempt <= options.retries; attempt++ {
-		var req *http.Request
-		req, err = http.NewRequest("GET", downloadURL, nil)
+	if fi, err := os.Stat(filePath); err == nil && fi.Size() > 0 {
+		return nil
+	}
+
+	var data []byte
+
+	if page == 0 && len(options.samplePageData) > 0 {
+		data = options.samplePageData
+	} else {
+		var resp *http.Response
+		var err error
+
+		for attempt := 0; attempt <= options.retries; attempt++ {
+			var req *http.Request
+			req, err = http.NewRequest("GET", downloadURL, nil)
+			if err != nil {
+				return err
+			}
+			req.Header.Set("Referer", fb.URL.String())
+			req.Header.Set("User-Agent", "Mozilla/5.0")
+
+			resp, err = http.DefaultClient.Do(req)
+			if err == nil {
+				break
+			}
+			time.Sleep(options.retryDelay)
+		}
+
+		if err != nil {
+			return fmt.Errorf("download failed for %s after %d attempts: %w", downloadURL, options.retries, err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("non-200 response from %s: %s", downloadURL, resp.Status)
+		}
+
+		data, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}
-		req.Header.Set("Referer", fb.URL.String())
-		req.Header.Set("User-Agent", "Mozilla/5.0")
+	}
 
-		resp, err = http.DefaultClient.Do(req)
+	if options.quality > 0 && options.quality < 100 {
+		compData, err := compressImageToJPEG(data, options.quality)
 		if err == nil {
-			break
+			data = compData
 		}
-		time.Sleep(options.retryDelay)
 	}
 
-	if err != nil {
-		return fmt.Errorf("download failed for %s after %d attempts: %w", downloadURL, options.retries, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("non-200 response from %s: %s", downloadURL, resp.Status)
-	}
-
-	filename := fmt.Sprintf("%04d%s", page, path.Ext(downloadURL))
-	filePath := filepath.Join(folder, filename)
-	file, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = io.Copy(file, resp.Body)
-	if err != nil {
-		return err
-	}
-	return nil
+	return os.WriteFile(filePath, data, 0644)
 }
 
 // cleanDownloadURL removes problematic sequences from the download URL
