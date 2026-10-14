@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -219,27 +221,42 @@ func (b *TelegramBot) sendDocument(chatID int64, filePath, caption string) error
 	}
 	defer file.Close()
 
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
 
-	_ = writer.WriteField("chat_id", strconv.FormatInt(chatID, 10))
-	if caption != "" {
-		_ = writer.WriteField("caption", caption)
-	}
+	go func() {
+		var writeErr error
+		defer func() {
+			if writeErr != nil {
+				pw.CloseWithError(writeErr)
+			} else {
+				pw.Close()
+			}
+		}()
 
-	part, err := writer.CreateFormFile("document", filepath.Base(filePath))
-	if err != nil {
-		return err
-	}
-	if _, err = io.Copy(part, file); err != nil {
-		return err
-	}
-	if err = writer.Close(); err != nil {
-		return err
-	}
+		if writeErr = writer.WriteField("chat_id", strconv.FormatInt(chatID, 10)); writeErr != nil {
+			return
+		}
+		if caption != "" {
+			if writeErr = writer.WriteField("caption", caption); writeErr != nil {
+				return
+			}
+		}
+
+		part, err := writer.CreateFormFile("document", filepath.Base(filePath))
+		if err != nil {
+			writeErr = err
+			return
+		}
+		if _, err = io.Copy(part, file); err != nil {
+			writeErr = err
+			return
+		}
+		writeErr = writer.Close()
+	}()
 
 	u := fmt.Sprintf("%s/sendDocument", b.apiBase)
-	req, err := http.NewRequest("POST", u, &body)
+	req, err := http.NewRequest("POST", u, pr)
 	if err != nil {
 		return err
 	}
@@ -516,12 +533,20 @@ func (b *TelegramBot) handleCallback(cb *TGCallbackQuery) {
 			return
 		}
 
+		// Reclaim download memory before creating PDF
+		runtime.GC()
+		debug.FreeOSMemory()
+
 		b.editMessageText(chatID, msgID, "📑 *Building PDF document...*", nil)
 		err = createPDF(outputPDF, tmpDir, int(chunkSize))
 		if err != nil {
 			b.editMessageText(chatID, msgID, fmt.Sprintf("❌ PDF creation error: %v", err), nil)
 			return
 		}
+
+		// Reclaim PDF creation memory before uploading
+		runtime.GC()
+		debug.FreeOSMemory()
 
 		fi, err := os.Stat(outputPDF)
 		if err != nil {
@@ -545,6 +570,10 @@ func (b *TelegramBot) handleCallback(cb *TGCallbackQuery) {
 			b.editMessageText(chatID, msgID, fmt.Sprintf("❌ Upload failed: %v", err), nil)
 			return
 		}
+
+		// Final memory reclaim
+		runtime.GC()
+		debug.FreeOSMemory()
 
 		b.editMessageText(chatID, msgID, fmt.Sprintf("✅ *Sent!* (%s)", formatBytes(fi.Size())), nil)
 	}()

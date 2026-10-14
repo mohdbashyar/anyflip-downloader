@@ -11,5 +11,6 @@ RUN apk --no-cache add ca-certificates
 COPY --from=build /app/anyflip-downloader /usr/local/bin/anyflip-downloader
 
 WORKDIR /data
+ENV GOMEMLIMIT=350MiB
 ENTRYPOINT ["anyflip-downloader"]
 CMD ["-bot"]

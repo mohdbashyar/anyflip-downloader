@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -51,6 +53,7 @@ type downloadOptions struct {
 }
 
 func init() {
+	debug.SetMemoryLimit(350 * 1024 * 1024) // 350 MB soft limit for 512MB hosts (Render free tier)
 	flag.Usage = printUsage
 	flag.StringVar(&tempDownloadFolder, "temp-download-folder", "", "Specifies the name of the temporary download folder")
 	flag.StringVar(&title, "title", "", "Specifies the name of the generated PDF document (uses book title if not specified)")
@@ -253,15 +256,13 @@ func createPDF(outputFile string, imageDir string, chunkSize int) error {
 	defer bar.Close()
 
 	impConf := pdfcpu.DefaultImportConfig()
-
-	for i := 0; i < len(imagePaths); i += chunkSize {
-		end := min(i+chunkSize, len(imagePaths))
-
-		imagePathChunk := imagePaths[i:end]
-		err = api.ImportImagesFile(imagePathChunk, outputFile, impConf, nil)
-		bar.Add(min(chunkSize, len(imagePaths)-i))
-	}
-
+	err = api.ImportImagesFile(imagePaths, outputFile, impConf, nil)
+	bar.Add(len(imagePaths))
 	fmt.Println()
+
+	// Reclaim memory immediately
+	runtime.GC()
+	debug.FreeOSMemory()
+
 	return err
 }
