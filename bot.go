@@ -437,25 +437,25 @@ func (b *TelegramBot) handleMessage(msg *TGMessage) {
 			InlineKeyboard: [][]TGInlineKeyboardButton{
 				{
 					{
-						Text:         fmt.Sprintf("🟢 Recommended (~%s) - 75%%", formatBytes(estimates.RecommendedBytes)),
+						Text:         fmt.Sprintf("🟢 Recommended (~%s) - Quality 75", formatBytes(estimates.RecommendedBytes)),
 						CallbackData: fmt.Sprintf("dl:%s:75", reqID),
 					},
 				},
 				{
 					{
-						Text:         fmt.Sprintf("🟡 Compact (~%s) - 60%%", formatBytes(estimates.CompactBytes)),
+						Text:         fmt.Sprintf("🟡 Compact (~%s) - Quality 60", formatBytes(estimates.CompactBytes)),
 						CallbackData: fmt.Sprintf("dl:%s:60", reqID),
 					},
 				},
 				{
 					{
-						Text:         fmt.Sprintf("🔵 Small (~%s) - 45%%", formatBytes(estimates.SmallBytes)),
+						Text:         fmt.Sprintf("🔵 Small (~%s) - Quality 45", formatBytes(estimates.SmallBytes)),
 						CallbackData: fmt.Sprintf("dl:%s:45", reqID),
 					},
 				},
 				{
 					{
-						Text:         fmt.Sprintf("⚪ Original (~%s) - 100%%", formatBytes(estimates.OriginalBytes)),
+						Text:         fmt.Sprintf("⚪ Original (~%s) - Uncompressed", formatBytes(estimates.OriginalBytes)),
 						CallbackData: fmt.Sprintf("dl:%s:100", reqID),
 					},
 				},

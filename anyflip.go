@@ -209,8 +209,13 @@ func (fb *flipbook) downloadPage(page int, folder string, options downloadOption
 
 	if options.quality > 0 && options.quality < 100 {
 		compData, err := compressImageToJPEG(data, options.quality)
-		if err == nil {
+		if err == nil && len(compData) < len(data) {
 			data = compData
+			filename = fmt.Sprintf("%04d.jpg", page)
+			filePath = filepath.Join(folder, filename)
+		} else {
+			filename = fmt.Sprintf("%04d%s", page, ext)
+			filePath = filepath.Join(folder, filename)
 		}
 	}
 

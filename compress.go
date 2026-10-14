@@ -137,19 +137,31 @@ func (fb *flipbook) samplePage() ([]byte, *SizeEstimates, error) {
 	}
 
 	if c75, err := compressImageToJPEG(data, QualityRecommended); err == nil {
-		estimates.RecommendedBytes = int64(len(c75)) * n
+		sz := int64(len(c75)) * n
+		if sz > estimates.OriginalBytes {
+			sz = estimates.OriginalBytes
+		}
+		estimates.RecommendedBytes = sz
 	} else {
 		estimates.RecommendedBytes = int64(float64(estimates.OriginalBytes) * 0.15)
 	}
 
 	if c60, err := compressImageToJPEG(data, QualityCompact); err == nil {
-		estimates.CompactBytes = int64(len(c60)) * n
+		sz := int64(len(c60)) * n
+		if sz > estimates.OriginalBytes {
+			sz = estimates.OriginalBytes
+		}
+		estimates.CompactBytes = sz
 	} else {
 		estimates.CompactBytes = int64(float64(estimates.OriginalBytes) * 0.10)
 	}
 
 	if c45, err := compressImageToJPEG(data, QualitySmall); err == nil {
-		estimates.SmallBytes = int64(len(c45)) * n
+		sz := int64(len(c45)) * n
+		if sz > estimates.OriginalBytes {
+			sz = estimates.OriginalBytes
+		}
+		estimates.SmallBytes = sz
 	} else {
 		estimates.SmallBytes = int64(float64(estimates.OriginalBytes) * 0.06)
 	}
