@@ -7,8 +7,9 @@ ENV CGO_ENABLED=0
 RUN go build -o anyflip-downloader .
 
 FROM alpine:latest
+RUN apk --no-cache add ca-certificates
 COPY --from=build /app/anyflip-downloader /usr/local/bin/anyflip-downloader
 
 WORKDIR /data
 ENTRYPOINT ["anyflip-downloader"]
-CMD ["--help"]
+CMD ["-bot"]
